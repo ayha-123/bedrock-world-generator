@@ -1,63 +1,122 @@
-import pybedrock
-import plyvel
+import sys
+import subprocess
+import tempfile
+import tarfile
+import os
+import glob
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Finding Subchunk encoding parameters...")
+    print("Reading complete writeSubchunk implementation...")
 
-    db = plyvel.DB("world/db", create_if_missing=False)
+    temp_dir = tempfile.mkdtemp()
 
-    target_key = bytes.fromhex("03000000110000002f00")
-    original = db.get(target_key)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "download",
+            "pybedrock==0.0.7",
+            "--no-binary",
+            ":all:",
+            "--no-deps",
+            "--no-build-isolation",
+            "-d",
+            temp_dir,
+        ],
+        capture_output=True,
+        text=True,
+    )
 
-    if original is None:
-        print("Target record not found.")
-        db.close()
+    if result.returncode != 0:
+        print("Download failed:")
+        print(result.stderr)
         return
 
-    subchunk = pybedrock.readSubchunk(original)
+    archives = glob.glob(os.path.join(temp_dir, "*.tar.gz"))
+
+    if not archives:
+        print("Source archive not found.")
+        return
+
+    archive = archives[0]
+
+    extract_dir = os.path.join(temp_dir, "source")
+    os.makedirs(extract_dir, exist_ok=True)
+
+    with tarfile.open(archive, "r:gz") as tar:
+        tar.extractall(extract_dir)
+
+    source_file = None
+
+    for root, dirs, files in os.walk(extract_dir):
+        for filename in files:
+            if filename == "subchunk.cpp":
+                source_file = os.path.join(root, filename)
+                break
+
+        if source_file:
+            break
+
+    if not source_file:
+        print("subchunk.cpp not found.")
+        return
 
     print()
-    print("Original size:", len(original), "bytes")
+    print("Source:", source_file)
+    print()
+    print("=" * 80)
+    print("COMPLETE py_writeSubchunk")
+    print("=" * 80)
+
+    with open(
+        source_file,
+        "r",
+        encoding="utf-8",
+        errors="ignore"
+    ) as f:
+        lines = f.readlines()
+
+    start = None
+    end = None
+
+    for i, line in enumerate(lines):
+        if "PyObject* py_writeSubchunk" in line:
+            start = i
+
+            # ابحث عن نهاية الدالة
+            brace_count = 0
+            started = False
+
+            for j in range(i, len(lines)):
+                brace_count += lines[j].count("{")
+                brace_count -= lines[j].count("}")
+
+                if "{" in lines[j]:
+                    started = True
+
+                if started and brace_count == 0:
+                    end = j + 1
+                    break
+
+            break
+
+    if start is None:
+        print("py_writeSubchunk not found.")
+        return
+
+    if end is None:
+        end = min(len(lines), start + 250)
+
+    for i in range(start, end):
+        print(f"{i + 1}: {lines[i].rstrip()}")
 
     print()
-    print("Searching for exact encoding match...")
-
-    found = False
-
-    for bits in range(1, 9):
-        for yindex in range(0, 256):
-
-            try:
-                encoded = pybedrock.writeSubchunk(
-                    subchunk,
-                    bits,
-                    yindex
-                )
-
-                if encoded == original:
-                    print()
-                    print("========================================")
-                    print("EXACT MATCH FOUND!")
-                    print("bitsperblock:", bits)
-                    print("yindex:", yindex)
-                    print("encoded size:", len(encoded))
-                    print("========================================")
-
-                    found = True
-
-            except Exception:
-                pass
-
-    if not found:
-        print()
-        print("No exact match found.")
-
-    db.close()
-
-    print()
-    print("Search completed.")
+    print("=" * 80)
+    print("END")
+    print("=" * 80)
 
 
 if __name__ == "__main__":
