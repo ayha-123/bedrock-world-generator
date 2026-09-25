@@ -2,10 +2,11 @@ import zipfile
 import os
 import shutil
 import plyvel
+import pybedrock as pb
 
 
 def main():
-    print("Reading Subchunk Palette...")
+    print("Testing Subchunk read/write...")
     print("=" * 80)
 
     if os.path.exists("world"):
@@ -44,60 +45,43 @@ def main():
         if not key.endswith(b"\x2f\x00"):
             continue
 
-        if len(value) < 100:
-            continue
+        try:
+            sc = pb.readSubchunk(value)
 
-        print("KEY:", key.hex())
-        print("SIZE:", len(value))
+            bits = (value[3] >> 1)
+            yindex = value[2]
 
-        # نعرف معلومات الـSubchunk من أول 4 bytes
-        version = value[0]
-        storage_layer = value[1]
-        yindex = value[2]
-        ptype = value[3]
+            print("KEY:", key.hex())
+            print("ORIGINAL SIZE:", len(value))
+            print("BITS:", bits)
+            print("Y INDEX:", yindex)
 
-        bits = ptype >> 1
-        blocks_per_word = 32 // bits
-        n32bit = (4096 + blocks_per_word - 1) // blocks_per_word
+            rebuilt = pb.writeSubchunk(sc, bits, yindex)
 
-        print("VERSION:", version)
-        print("STORAGE LAYER:", storage_layer)
-        print("Y INDEX:", yindex)
-        print("BITS PER BLOCK:", bits)
-        print("WORDS:", n32bit)
+            print("REBUILT SIZE:", len(rebuilt))
+            print("SIZE DIFFERENCE:", len(value) - len(rebuilt))
 
-        # writeSubchunk يستخدم:
-        # 4 bytes header
-        # packed block data
-        # 4 bytes footer
-        palette_start = 4 + (n32bit * 4) + 4
+            print()
+            print("ORIGINAL HEADER:", value[:4].hex())
+            print("REBUILT HEADER :", rebuilt[:4].hex())
 
-        print("PALETTE START:", palette_start)
+            print()
+            print("FIRST 32 ORIGINAL:")
+            print(value[:32].hex())
 
-        palette = value[palette_start:]
+            print()
+            print("FIRST 32 REBUILT:")
+            print(rebuilt[:32].hex())
 
-        print("PALETTE SIZE:", len(palette))
+            break
 
-        print()
-        print("PALETTE HEX:")
-        print(palette.hex())
-
-        print()
-        print("PALETTE TEXT:")
-        print(
-            "".join(
-                chr(b) if 32 <= b <= 126 else "."
-                for b in palette
-            )
-        )
-
-        print()
-        print("=" * 80)
-
-        break
+        except Exception as e:
+            print("ERROR:", repr(e))
 
     db.close()
 
+    print()
+    print("=" * 80)
     print("Finished.")
 
 
