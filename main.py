@@ -28,3 +28,18 @@ def main():
                 f"VALUE_SIZE={len(value):5d}  "
                 f"KEY={key.hex()}"
             )
+
+            count += 1
+
+        if count >= 50:
+            break
+
+    db.close()
+
+    print("--------------------------------")
+    print("Records inspected:", count)
+    print("Chunk detection completed.")
+
+
+if __name__ == "__main__":
+    main()
