@@ -1,32 +1,37 @@
 import os
+import plyvel
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Inspecting LevelDB files safely...")
+    print("Opening Bedrock LevelDB...")
 
     db_path = "world/db"
 
     print()
-    print("DB files:")
+    print("Opening:", db_path)
 
-    for filename in os.listdir(db_path):
-        path = os.path.join(db_path, filename)
+    db = plyvel.DB(db_path, create_if_missing=False)
 
-        if os.path.isfile(path):
-            size = os.path.getsize(path)
-
-            print()
-            print("File:", filename)
-            print("Size:", size, "bytes")
-
-            with open(path, "rb") as f:
-                data = f.read(64)
-
-            print("First 64 bytes:", data.hex())
-
+    print("LevelDB opened successfully!")
     print()
-    print("Safe inspection completed.")
+
+    count = 0
+
+    for key, value in db:
+        print("KEY:", key[:80].hex())
+        print("VALUE SIZE:", len(value), "bytes")
+        print()
+
+        count += 1
+
+        if count >= 20:
+            break
+
+    db.close()
+
+    print("Keys inspected:", count)
+    print("LevelDB inspection completed successfully.")
 
 
 if __name__ == "__main__":
