@@ -19,9 +19,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Test generator
-        run: python main.py
-
       - name: Extract world template
         run: |
           rm -rf extracted world output
@@ -38,6 +35,9 @@ jobs:
 
           test -f world/level.dat
           test -d world/db
+
+      - name: Test generator
+        run: python main.py
 
       - name: Create MCWorld
         run: |
