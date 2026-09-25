@@ -8,8 +8,7 @@ import json
 
 
 def main():
-    print("Minecraft Bedrock World Generator")
-    print("Reading blockentity_demo NBT examples...")
+    print("Reading subchunk.nbt.json")
     print("=" * 80)
 
     temp_dir = tempfile.mkdtemp()
@@ -48,45 +47,28 @@ def main():
     with tarfile.open(archives[0], "r:gz") as tar:
         tar.extractall(extract_dir)
 
-    notebook = None
+    target = None
 
     for root, dirs, files in os.walk(extract_dir):
-        if "blockentity_demo.ipynb" in files:
-            notebook = os.path.join(root, "blockentity_demo.ipynb")
+        if "subchunk.nbt.json" in files:
+            target = os.path.join(root, "subchunk.nbt.json")
             break
 
-    if notebook is None:
-        print("Notebook not found.")
+    if target is None:
+        print("subchunk.nbt.json not found.")
         return
 
-    with open(notebook, "r", encoding="utf-8") as f:
+    print("FILE:", target)
+    print("=" * 80)
+
+    with open(target, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    found = 0
-
-    for cell_number, cell in enumerate(data.get("cells", []), 1):
-        source = "".join(cell.get("source", []))
-
-        if any(x in source for x in [
-            "writeNBT",
-            "readNBT",
-            "cspawner",
-            "schunk",
-            "palette"
-        ]):
-            found += 1
-
-            print()
-            print("=" * 80)
-            print("CELL:", cell_number)
-            print("=" * 80)
-            print(source)
+    print(json.dumps(data, ensure_ascii=False, indent=2))
 
     print()
     print("=" * 80)
-    print("Found relevant cells:", found)
     print("Finished.")
-    print("No world files were modified.")
 
 
 if __name__ == "__main__":
