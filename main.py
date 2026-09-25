@@ -1,11 +1,26 @@
-import os
 import pybedrock
 import plyvel
 
 
+def get_shape(data):
+    shape = []
+
+    current = data
+
+    while isinstance(current, list):
+        shape.append(len(current))
+
+        if not current:
+            break
+
+        current = current[0]
+
+    return shape
+
+
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Testing pybedrock subchunk reader...")
+    print("Analyzing decoded Subchunk structure...")
 
     db = plyvel.DB("world/db", create_if_missing=False)
 
@@ -17,32 +32,27 @@ def main():
         db.close()
         return
 
-    print()
-    print("Record found")
-    print("Key:", target_key.hex())
-    print("Value size:", len(value), "bytes")
+    result = pybedrock.readSubchunk(value)
 
     print()
-    print("Testing pybedrock.readSubchunk...")
+    print("Record size:", len(value), "bytes")
+    print("Result type:", type(result))
+    print("Structure:", get_shape(result))
 
-    try:
-        result = pybedrock.readSubchunk(value)
+    print()
+    print("Top-level elements:", len(result))
 
-        print()
-        print("SUCCESS!")
-        print("Result type:", type(result))
-        print("Result:", result)
+    for i, item in enumerate(result):
+        if isinstance(item, list):
+            print(f"Element {i}: {len(item)} rows")
 
-    except Exception as e:
-        print()
-        print("readSubchunk failed.")
-        print("Error type:", type(e).__name__)
-        print("Error:", str(e))
+            if len(item) > 0 and isinstance(item[0], list):
+                print(f"Element {i}: {len(item[0])} columns")
 
     db.close()
 
     print()
-    print("Test completed.")
+    print("Structure analysis completed.")
 
 
 if __name__ == "__main__":
