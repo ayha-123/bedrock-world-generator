@@ -7,7 +7,7 @@ import glob
 
 
 def main():
-    print("Searching for index2pos...")
+    print("Searching for getuInt...")
     print("=" * 80)
 
     temp_dir = tempfile.mkdtemp()
@@ -51,24 +51,36 @@ def main():
             if filename.endswith((".cpp", ".h", ".hpp")):
                 path = os.path.join(root, filename)
 
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                with open(
+                    path,
+                    "r",
+                    encoding="utf-8",
+                    errors="replace"
+                ) as f:
                     source = f.read()
 
-                if "index2pos" in source:
+                if "getuInt" in source:
                     print("FILE:", path)
                     print("=" * 80)
 
                     pos = 0
+
                     while True:
-                        pos = source.find("index2pos", pos)
+                        pos = source.find("getuInt", pos)
 
                         if pos == -1:
                             break
 
-                        print(source[max(0, pos - 1000):pos + 2500])
+                        print(
+                            source[
+                                max(0, pos - 500):
+                                pos + 1500
+                            ]
+                        )
+
                         print("=" * 80)
 
-                        pos += len("index2pos")
+                        pos += len("getuInt")
 
     print("Finished.")
 
