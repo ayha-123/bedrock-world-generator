@@ -1,75 +1,118 @@
-import plyvel
-
-
-DB_PATH = "world/db"
-
-TARGETS = [
-    bytes.fromhex("02000000110000002f00"),
-    bytes.fromhex("03000000110000002f00"),
-    bytes.fromhex("03000000120000002f00"),
-]
+import sys
+import subprocess
+import tempfile
+import tarfile
+import os
+import glob
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("READ-ONLY Palette Inspector")
-    print("=" * 70)
+    print("Reading writeNBT implementation...")
+    print("=" * 80)
 
-    db = plyvel.DB(DB_PATH, create_if_missing=False)
+    temp_dir = tempfile.mkdtemp()
 
-    try:
-        for key in TARGETS:
-            value = db.get(key)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "download",
+            "pybedrock==0.0.7",
+            "--no-binary",
+            ":all:",
+            "--no-deps",
+            "--no-build-isolation",
+            "-d",
+            temp_dir,
+        ],
+        capture_output=True,
+        text=True,
+    )
 
-            if value is None:
-                print("Not found:", key.hex())
-                continue
+    if result.returncode != 0:
+        print("Download failed:")
+        print(result.stderr)
+        return
 
-            print()
-            print("-" * 70)
-            print("KEY:", key.hex())
-            print("TOTAL SIZE:", len(value))
+    archives = glob.glob(os.path.join(temp_dir, "*.tar.gz"))
 
-            # أول 4 بايت هي header
-            bits = value[3] >> 1
+    if not archives:
+        print("Source archive not found.")
+        return
 
-            if bits == 0:
-                print("Invalid bits_per_block")
-                continue
+    extract_dir = os.path.join(temp_dir, "source")
+    os.makedirs(extract_dir, exist_ok=True)
 
-            blocks_per_word = 32 // bits
-            n32bit = (4096 // blocks_per_word) + 1
+    with tarfile.open(archives[0], "r:gz") as tar:
+        tar.extractall(extract_dir)
 
-            block_data_size = n32bit * 4
+    # البحث عن ملف C/C++ الذي يحتوي writeNBT
+    matches = []
 
-            palette_offset = 4 + block_data_size
+    for root, dirs, files in os.walk(extract_dir):
+        for filename in files:
+            if filename.endswith((".cpp", ".c", ".h")):
+                path = os.path.join(root, filename)
 
-            print("BITS PER BLOCK:", bits)
-            print("BLOCK DATA SIZE:", block_data_size)
-            print("PALETTE OFFSET:", palette_offset)
+                try:
+                    with open(
+                        path,
+                        "r",
+                        encoding="utf-8",
+                        errors="ignore"
+                    ) as f:
+                        content = f.read()
 
-            # نطبع 100 بايت بعد block data
-            start = palette_offset
-            end = min(start + 100, len(value))
+                    if "writeNBT" in content:
+                        matches.append(path)
 
-            print()
-            print("BYTES AFTER BLOCK DATA:")
-            print(value[start:end].hex(" "))
+                except Exception:
+                    pass
 
-            print()
-            print("BYTES WITH OFFSETS:")
+    if not matches:
+        print("writeNBT source not found.")
+        return
 
-            for i in range(start, end, 16):
-                chunk = value[i:min(i + 16, end)]
-                print(f"{i:04X}: {chunk.hex(' ')}")
-
-    finally:
-        db.close()
+    print("Files containing writeNBT:")
+    for path in matches:
+        print(path)
 
     print()
-    print("=" * 70)
+    print("=" * 80)
+
+    # طباعة الجزء الذي يحتوي على writeNBT
+    for path in matches:
+        with open(
+            path,
+            "r",
+            encoding="utf-8",
+            errors="ignore"
+        ) as f:
+            lines = f.readlines()
+
+        for i, line in enumerate(lines):
+            if "writeNBT" not in line:
+                continue
+
+            print()
+            print("=" * 80)
+            print("FILE:", path)
+            print("STARTING AROUND LINE:", i + 1)
+            print("=" * 80)
+
+            start = max(0, i - 20)
+            end = min(len(lines), i + 180)
+
+            for j in range(start, end):
+                print(f"{j + 1}: {lines[j].rstrip()}")
+
+            print()
+            print("=" * 80)
+
     print("Finished.")
-    print("No files were modified.")
+    print("No world files were modified.")
 
 
 if __name__ == "__main__":
