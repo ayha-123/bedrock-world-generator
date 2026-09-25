@@ -1,37 +1,24 @@
 import os
-import pybedrock
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Testing Bedrock LevelDB access...")
+    print("Checking world template...")
 
-    db_path = "world/db"
-
-    print()
-    print("DB path:", db_path)
-    print("DB exists:", os.path.exists(db_path))
-
-    if os.path.exists(db_path):
-        print("DB contents:")
-        for item in os.listdir(db_path)[:10]:
-            print("-", item)
+    world_path = "world"
 
     print()
-    print("Testing listkeys...")
+    print("World exists:", os.path.isdir(world_path))
+    print("Level.dat exists:", os.path.isfile(os.path.join(world_path, "level.dat")))
+    print("DB exists:", os.path.isdir(os.path.join(world_path, "db")))
 
-    try:
-        result = pybedrock.listkeys(db_path)
-        print("listkeys succeeded!")
-        print("Result type:", type(result))
-        print("Result:", result)
-    except Exception as e:
-        print("listkeys failed:")
-        print(type(e).__name__, ":", e)
+    if os.path.isdir(os.path.join(world_path, "db")):
+        files = os.listdir(os.path.join(world_path, "db"))
+        print("DB items:", len(files))
 
     print()
-    print("Test completed.")
+    print("Template check completed successfully.")
 
 
 if __name__ == "__main__":
-    main()
+    main() 
