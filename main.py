@@ -1,108 +1,67 @@
-import os
-import struct
 import plyvel
 
 
 DB_PATH = "world/db"
 
-
-def read_u32(data, offset):
-    if offset + 4 > len(data):
-        return None
-    return struct.unpack_from("<I", data, offset)[0]
-
-
-def inspect_subchunk(key, value):
-    if len(value) < 8:
-        return None
-
-    version = value[0]
-    storage_layer = value[1]
-    yindex = value[2]
-    ptype = value[3]
-
-    savetype = ptype & 1
-    bits_per_block = ptype >> 1
-
-    if bits_per_block == 0:
-        blocks_per_word = 0
-    else:
-        blocks_per_word = 32 // bits_per_block
-
-    # عدد كلمات 32-bit التي يقرأها pybedrock
-    if blocks_per_word:
-        n32bit = (4096 // blocks_per_word) + 1
-        data_size = n32bit * 4
-    else:
-        n32bit = 0
-        data_size = 0
-
-    palette_offset = 4 + data_size
-
-    palette_size = None
-
-    if palette_offset + 4 <= len(value):
-        palette_size = read_u32(value, palette_offset)
-
-    return {
-        "key": key.hex(),
-        "value_size": len(value),
-        "version": version,
-        "storage_layer": storage_layer,
-        "yindex": yindex,
-        "ptype": ptype,
-        "savetype": savetype,
-        "bits_per_block": bits_per_block,
-        "blocks_per_word": blocks_per_word,
-        "n32bit": n32bit,
-        "data_size": data_size,
-        "palette_offset": palette_offset,
-        "palette_size": palette_size,
-    }
+TARGETS = [
+    bytes.fromhex("02000000110000002f00"),
+    bytes.fromhex("03000000110000002f00"),
+    bytes.fromhex("03000000120000002f00"),
+]
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("READ-ONLY Subchunk Inspector")
+    print("READ-ONLY Palette Inspector")
     print("=" * 70)
-
-    if not os.path.isdir(DB_PATH):
-        print("ERROR: world/db not found.")
-        return
-
-    print("Opening LevelDB...")
-    print("Database:", DB_PATH)
-    print()
 
     db = plyvel.DB(DB_PATH, create_if_missing=False)
 
-    found = 0
-
     try:
-        for key, value in db:
-            # سجلات الـSubchunk التي نريد فحصها
-            # نركز على المفاتيح التي تنتهي بـ 2f00
-            if not key.endswith(bytes.fromhex("2f00")):
+        for key in TARGETS:
+            value = db.get(key)
+
+            if value is None:
+                print("Not found:", key.hex())
                 continue
 
-            info = inspect_subchunk(key, value)
-
-            if info is None:
-                continue
-
-            found += 1
-
+            print()
             print("-" * 70)
-            print("SUBCHUNK", found)
+            print("KEY:", key.hex())
+            print("TOTAL SIZE:", len(value))
 
-            for name, val in info.items():
-                print(f"{name:20}: {val}")
+            # أول 4 بايت هي header
+            bits = value[3] >> 1
 
-            # نوقف بعد أول 20 سجل حتى يبقى الناتج صغيراً
-            if found >= 20:
-                print()
-                print("Stopped after 20 subchunks.")
-                break
+            if bits == 0:
+                print("Invalid bits_per_block")
+                continue
+
+            blocks_per_word = 32 // bits
+            n32bit = (4096 // blocks_per_word) + 1
+
+            block_data_size = n32bit * 4
+
+            palette_offset = 4 + block_data_size
+
+            print("BITS PER BLOCK:", bits)
+            print("BLOCK DATA SIZE:", block_data_size)
+            print("PALETTE OFFSET:", palette_offset)
+
+            # نطبع 100 بايت بعد block data
+            start = palette_offset
+            end = min(start + 100, len(value))
+
+            print()
+            print("BYTES AFTER BLOCK DATA:")
+            print(value[start:end].hex(" "))
+
+            print()
+            print("BYTES WITH OFFSETS:")
+
+            for i in range(start, end, 16):
+                chunk = value[i:min(i + 16, end)]
+                print(f"{i:04X}: {chunk.hex(' ')}")
 
     finally:
         db.close()
