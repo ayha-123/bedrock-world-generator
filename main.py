@@ -4,7 +4,7 @@ import plyvel
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Testing Subchunk encoding...")
+    print("Finding Subchunk encoding parameters...")
 
     db = plyvel.DB("world/db", create_if_missing=False)
 
@@ -22,36 +22,42 @@ def main():
     print("Original size:", len(original), "bytes")
 
     print()
-    print("Testing bitsperblock values...")
+    print("Searching for exact encoding match...")
 
-    for bits in [1, 2, 3, 4, 5, 6, 7, 8]:
+    found = False
 
-        try:
-            encoded = pybedrock.writeSubchunk(
-                subchunk,
-                bits,
-                0
-            )
+    for bits in range(1, 9):
+        for yindex in range(0, 256):
 
-            print(
-                f"bits={bits}: "
-                f"SUCCESS, size={len(encoded)} bytes"
-            )
-
-            if encoded == original:
-                print(
-                    f"  >>> EXACT MATCH with original!"
+            try:
+                encoded = pybedrock.writeSubchunk(
+                    subchunk,
+                    bits,
+                    yindex
                 )
 
-        except Exception as e:
-            print(
-                f"bits={bits}: FAILED - {repr(e)}"
-            )
+                if encoded == original:
+                    print()
+                    print("========================================")
+                    print("EXACT MATCH FOUND!")
+                    print("bitsperblock:", bits)
+                    print("yindex:", yindex)
+                    print("encoded size:", len(encoded))
+                    print("========================================")
+
+                    found = True
+
+            except Exception:
+                pass
+
+    if not found:
+        print()
+        print("No exact match found.")
 
     db.close()
 
     print()
-    print("Encoding test completed.")
+    print("Search completed.")
 
 
 if __name__ == "__main__":
