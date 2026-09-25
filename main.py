@@ -1,44 +1,77 @@
-import struct
 import plyvel
+import struct
+
+
+def read_varint(data, offset=0):
+    value = 0
+    shift = 0
+
+    while offset < len(data):
+        byte = data[offset]
+        offset += 1
+
+        value |= (byte & 0x7F) << shift
+
+        if not (byte & 0x80):
+            return value, offset
+
+        shift += 7
+
+        if shift >= 35:
+            return None, offset
+
+    return None, offset
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Detecting Minecraft chunks...")
+    print("Inspecting one Chunk record...")
 
-    db_path = "world/db"
-    db = plyvel.DB(db_path, create_if_missing=False)
+    db = plyvel.DB("world/db", create_if_missing=False)
 
-    count = 0
+    target_key = bytes.fromhex("03000000110000002f00")
+
+    value = db.get(target_key)
+
+    if value is None:
+        print("Target record was not found.")
+        db.close()
+        return
 
     print()
-    print("Possible chunk records:")
-    print("--------------------------------")
+    print("Target key:", target_key.hex())
+    print("Value size:", len(value), "bytes")
 
-    for key, value in db:
+    print()
+    print("First 128 bytes:")
+    print(value[:128].hex())
 
-        # مفاتيح الـ chunk عادةً تحتوي على X و Z كـ int32
-        if len(key) >= 8:
-            x = struct.unpack("<i", key[0:4])[0]
-            z = struct.unpack("<i", key[4:8])[0]
+    print()
+    print("Possible VarInts:")
 
-            print(
-                f"X={x:6d}  Z={z:6d}  "
-                f"KEY_SIZE={len(key):2d}  "
-                f"VALUE_SIZE={len(value):5d}  "
-                f"KEY={key.hex()}"
-            )
+    offset = 0
 
-            count += 1
-
-        if count >= 50:
+    for i in range(20):
+        if offset >= len(value):
             break
+
+        number, new_offset = read_varint(value, offset)
+
+        if number is None:
+            break
+
+        print(
+            f"{i + 1:02d}: "
+            f"offset={offset:3d} "
+            f"value={number}"
+        )
+
+        offset = new_offset
 
     db.close()
 
-    print("--------------------------------")
-    print("Records inspected:", count)
-    print("Chunk detection completed.")
+    print()
+    print("Chunk record inspection completed.")
 
 
 if __name__ == "__main__":
