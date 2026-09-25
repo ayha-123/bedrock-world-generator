@@ -1,4 +1,4 @@
-name: Test Minecraft Generator
+name: Test Minecraft Generatorname: Test Minecraft Generator
 
 on:
   workflow_dispatch:
@@ -8,16 +8,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: تحميل المشروع
-        uses: actions/checkout@v6
+      - name: Checkout project
+        uses: actions/checkout@v4
 
-      - name: تجهيز Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: تثبيت المكتبات
+      - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: تشغيل المولد
+      - name: Run generator
         run: python main.py
