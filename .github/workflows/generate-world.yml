@@ -1,4 +1,4 @@
-name: Test Minecraft Generatorname: Test Minecraft Generator
+name: Test Minecraft Generator
 
 on:
   workflow_dispatch:
