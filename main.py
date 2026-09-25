@@ -3,18 +3,17 @@ import pybedrock
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Testing pybedrock binary functions...")
+    print("Testing world database access...")
 
     print()
-    print("loadbinary:")
-    print(pybedrock.loadbinary.__doc__)
+    print("Available database functions:")
+
+    for name in dir(pybedrock):
+        if "key" in name.lower() or "db" in name.lower() or "level" in name.lower():
+            print("-", name)
 
     print()
-    print("writebinary:")
-    print(pybedrock.writebinary.__doc__)
-
-    print()
-    print("Binary API test completed.")
+    print("Test completed.")
 
 
 if __name__ == "__main__":
