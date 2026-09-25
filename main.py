@@ -8,7 +8,7 @@ import glob
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Reading complete writeSubchunk implementation...")
+    print("Reading complete readSubchunk implementation...")
 
     temp_dir = tempfile.mkdtemp()
 
@@ -41,12 +41,10 @@ def main():
         print("Source archive not found.")
         return
 
-    archive = archives[0]
-
     extract_dir = os.path.join(temp_dir, "source")
     os.makedirs(extract_dir, exist_ok=True)
 
-    with tarfile.open(archive, "r:gz") as tar:
+    with tarfile.open(archives[0], "r:gz") as tar:
         tar.extractall(extract_dir)
 
     source_file = None
@@ -56,20 +54,12 @@ def main():
             if filename == "subchunk.cpp":
                 source_file = os.path.join(root, filename)
                 break
-
         if source_file:
             break
 
     if not source_file:
         print("subchunk.cpp not found.")
         return
-
-    print()
-    print("Source:", source_file)
-    print()
-    print("=" * 80)
-    print("COMPLETE py_writeSubchunk")
-    print("=" * 80)
 
     with open(
         source_file,
@@ -83,10 +73,9 @@ def main():
     end = None
 
     for i, line in enumerate(lines):
-        if "PyObject* py_writeSubchunk" in line:
+        if "PyObject* py_readSubchunk" in line:
             start = i
 
-            # ابحث عن نهاية الدالة
             brace_count = 0
             started = False
 
@@ -104,11 +93,16 @@ def main():
             break
 
     if start is None:
-        print("py_writeSubchunk not found.")
+        print("py_readSubchunk not found.")
         return
 
     if end is None:
-        end = min(len(lines), start + 250)
+        end = min(len(lines), start + 300)
+
+    print()
+    print("=" * 80)
+    print("COMPLETE py_readSubchunk")
+    print("=" * 80)
 
     for i in range(start, end):
         print(f"{i + 1}: {lines[i].rstrip()}")
