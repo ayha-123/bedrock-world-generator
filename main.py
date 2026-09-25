@@ -1,61 +1,49 @@
 import pybedrock
-import plyvel
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Inspecting Subchunk palette...")
-
-    db = plyvel.DB("world/db", create_if_missing=False)
-
-    target_key = bytes.fromhex("03000000110000002f00")
-    value = db.get(target_key)
-
-    if value is None:
-        print("Target record not found.")
-        db.close()
-        return
-
-    result = pybedrock.readSubchunk(value)
+    print("Inspecting pybedrock writeSubchunk...")
 
     print()
-    print("Record size:", len(value), "bytes")
-    print("Decoded structure: 16 x 16 x 16")
+    print("writeSubchunk object:")
+    print(pybedrock.writeSubchunk)
 
     print()
-    print("Searching for palette information...")
-
-    # اطبع نوع ومحتويات العناصر العليا فقط
-    for i, item in enumerate(result):
-        print(
-            f"Layer {i}: type={type(item).__name__}, "
-            f"rows={len(item)}, "
-            f"columns={len(item[0]) if item else 0}"
-        )
+    print("writeSubchunk documentation:")
+    print(pybedrock.writeSubchunk.__doc__)
 
     print()
-    print("Testing writeSubchunk compatibility...")
+    print("writeSubchunk attributes:")
 
     try:
-        encoded = pybedrock.writeSubchunk(result)
-
-        print("writeSubchunk SUCCESS!")
-        print("Encoded size:", len(encoded), "bytes")
-
-        if encoded == value:
-            print("Encoded data is IDENTICAL to original record.")
-        else:
-            print("Encoded data differs from original record.")
-            print("This is useful information, but we will NOT write it to the world yet.")
-
+        print(dir(pybedrock.writeSubchunk))
     except Exception as e:
-        print("writeSubchunk FAILED")
-        print("Error:", repr(e))
-
-    db.close()
+        print("Could not inspect attributes:", repr(e))
 
     print()
-    print("Palette/write analysis completed.")
+    print("Inspecting related functions...")
+
+    for name in [
+        "readSubchunk",
+        "writeSubchunk",
+        "readNBT",
+        "writeNBT",
+        "loadbinary",
+        "writebinary",
+    ]:
+        obj = getattr(pybedrock, name, None)
+
+        print()
+        print(name, "=>", obj)
+
+        try:
+            print("doc:", obj.__doc__)
+        except Exception as e:
+            print("doc error:", repr(e))
+
+    print()
+    print("Inspection completed.")
 
 
 if __name__ == "__main__":
