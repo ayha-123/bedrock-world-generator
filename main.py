@@ -4,11 +4,10 @@ import tempfile
 import tarfile
 import os
 import glob
-import json
 
 
 def main():
-    print("Reading subchunk.nbt.json")
+    print("Searching pybedrock source files...")
     print("=" * 80)
 
     temp_dir = tempfile.mkdtemp()
@@ -47,27 +46,27 @@ def main():
     with tarfile.open(archives[0], "r:gz") as tar:
         tar.extractall(extract_dir)
 
-    target = None
+    print("Files containing NBT or JSON:")
+    print()
+
+    found = 0
 
     for root, dirs, files in os.walk(extract_dir):
-        if "subchunk.nbt.json" in files:
-            target = os.path.join(root, "subchunk.nbt.json")
-            break
+        for filename in files:
+            lower = filename.lower()
 
-    if target is None:
-        print("subchunk.nbt.json not found.")
-        return
-
-    print("FILE:", target)
-    print("=" * 80)
-
-    with open(target, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    print(json.dumps(data, ensure_ascii=False, indent=2))
+            if (
+                "nbt" in lower
+                or lower.endswith(".json")
+                or "subchunk" in lower
+            ):
+                path = os.path.join(root, filename)
+                print(path)
+                found += 1
 
     print()
     print("=" * 80)
+    print("Found:", found)
     print("Finished.")
 
 
