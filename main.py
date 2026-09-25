@@ -1,72 +1,83 @@
-import sys
-import subprocess
-import tempfile
-import tarfile
+import zipfile
 import os
-import glob
+import shutil
+import plyvel
+import pybedrock as pb
 
 
 def main():
-    print("Searching pybedrock source files...")
+    print("Reading real Minecraft world...")
     print("=" * 80)
 
-    temp_dir = tempfile.mkdtemp()
+    if os.path.exists("world"):
+        shutil.rmtree("world")
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "download",
-            "pybedrock==0.0.7",
-            "--no-binary",
-            ":all:",
-            "--no-deps",
-            "--no-build-isolation",
-            "-d",
-            temp_dir,
-        ],
-        capture_output=True,
-        text=True,
-    )
+    os.makedirs("world", exist_ok=True)
 
-    if result.returncode != 0:
-        print(result.stderr)
-        return
+    with zipfile.ZipFile("template.zip", "r") as z:
+        z.extractall("world")
 
-    archives = glob.glob(os.path.join(temp_dir, "*.tar.gz"))
+    # إذا كان الـZIP يحتوي مجلدًا داخليًا
+    if not os.path.exists("world/db"):
+        folders = [
+            x for x in os.listdir("world")
+            if os.path.isdir(os.path.join("world", x))
+        ]
 
-    if not archives:
-        print("Source archive not found.")
-        return
+        if folders and os.path.exists(
+            os.path.join("world", folders[0], "db")
+        ):
+            old = os.path.join("world", folders[0])
+            for item in os.listdir(old):
+                shutil.move(
+                    os.path.join(old, item),
+                    os.path.join("world", item)
+                )
+            os.rmdir(old)
 
-    extract_dir = os.path.join(temp_dir, "source")
-    os.makedirs(extract_dir, exist_ok=True)
-
-    with tarfile.open(archives[0], "r:gz") as tar:
-        tar.extractall(extract_dir)
-
-    print("Files containing NBT or JSON:")
-    print()
+    db = plyvel.DB("world/db", create_if_missing=False)
 
     found = 0
 
-    for root, dirs, files in os.walk(extract_dir):
-        for filename in files:
-            lower = filename.lower()
+    for key, value in db:
 
-            if (
-                "nbt" in lower
-                or lower.endswith(".json")
-                or "subchunk" in lower
-            ):
-                path = os.path.join(root, filename)
-                print(path)
-                found += 1
+        # Subchunk records تنتهي بـ 2f00
+        if not key.endswith(b"\x2f\x00"):
+            continue
+
+        if len(value) < 8:
+            continue
+
+        try:
+            # pybedrock يستطيع قراءة الـSubchunk نفسه
+            sc = pb.readSubchunk(value)
+
+            print()
+            print("=" * 80)
+            print("KEY:", key.hex())
+            print("VALUE SIZE:", len(value))
+            print("SUBCHUNK SIZE:", len(sc))
+            print("DIMENSIONS:", [len(sc), len(sc[0]), len(sc[0][0])])
+
+            # أول 16 بلوك من أول طبقة
+            print()
+            print("FIRST LAYER:")
+            for row in sc[0]:
+                print(" ".join(map(str, row)))
+
+            found += 1
+
+            # نكتفي بأول سجل صالح
+            break
+
+        except Exception as e:
+            continue
+
+    db.close()
 
     print()
     print("=" * 80)
-    print("Found:", found)
+    print("Valid subchunks found:", found)
     print("Finished.")
 
 
