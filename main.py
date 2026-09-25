@@ -1,84 +1,78 @@
-import zipfile
+import sys
+import subprocess
+import tempfile
+import tarfile
 import os
-import shutil
-import plyvel
-import pybedrock as pb
+import glob
 
 
 def main():
-    print("Testing Subchunk read/write...")
+    print("Reading pybedrock readSubchunk source...")
     print("=" * 80)
 
-    if os.path.exists("world"):
-        shutil.rmtree("world")
+    temp_dir = tempfile.mkdtemp()
 
-    os.makedirs("world", exist_ok=True)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "download",
+            "pybedrock==0.0.7",
+            "--no-binary",
+            ":all:",
+            "--no-deps",
+            "--no-build-isolation",
+            "-d",
+            temp_dir,
+        ],
+        capture_output=True,
+        text=True,
+    )
 
-    with zipfile.ZipFile("template.zip", "r") as z:
-        z.extractall("world")
+    if result.returncode != 0:
+        print(result.stderr)
+        return
 
-    if not os.path.exists("world/db"):
-        folders = [
-            x for x in os.listdir("world")
-            if os.path.isdir(os.path.join("world", x))
-        ]
+    archives = glob.glob(os.path.join(temp_dir, "*.tar.gz"))
 
-        for folder in folders:
-            candidate = os.path.join("world", folder, "db")
+    if not archives:
+        print("Source archive not found.")
+        return
 
-            if os.path.exists(candidate):
-                old = os.path.join("world", folder)
+    extract_dir = os.path.join(temp_dir, "source")
+    os.makedirs(extract_dir, exist_ok=True)
 
-                for item in os.listdir(old):
-                    shutil.move(
-                        os.path.join(old, item),
-                        os.path.join("world", item)
-                    )
+    with tarfile.open(archives[0], "r:gz") as tar:
+        tar.extractall(extract_dir)
 
-                os.rmdir(old)
-                break
+    target = None
 
-    db = plyvel.DB("world/db", create_if_missing=False)
-
-    for key, value in db:
-
-        if not key.endswith(b"\x2f\x00"):
-            continue
-
-        try:
-            sc = pb.readSubchunk(value)
-
-            bits = (value[3] >> 1)
-            yindex = value[2]
-
-            print("KEY:", key.hex())
-            print("ORIGINAL SIZE:", len(value))
-            print("BITS:", bits)
-            print("Y INDEX:", yindex)
-
-            rebuilt = pb.writeSubchunk(sc, bits, yindex)
-
-            print("REBUILT SIZE:", len(rebuilt))
-            print("SIZE DIFFERENCE:", len(value) - len(rebuilt))
-
-            print()
-            print("ORIGINAL HEADER:", value[:4].hex())
-            print("REBUILT HEADER :", rebuilt[:4].hex())
-
-            print()
-            print("FIRST 32 ORIGINAL:")
-            print(value[:32].hex())
-
-            print()
-            print("FIRST 32 REBUILT:")
-            print(rebuilt[:32].hex())
-
+    for root, dirs, files in os.walk(extract_dir):
+        if "subchunk.cpp" in files:
+            target = os.path.join(root, "subchunk.cpp")
             break
 
-        except Exception as e:
-            print("ERROR:", repr(e))
+    if target is None:
+        print("subchunk.cpp not found.")
+        return
 
-    db.close()
+    with open(target, "r", encoding="utf-8", errors="replace") as f:
+        source = f.read()
+
+    start = source.find("py_readSubchunk")
+
+    if start == -1:
+        print("py_readSubchunk not found.")
+        print()
+        print("Functions found:")
+        for line in source.splitlines():
+            if "readSubchunk" in line:
+                print(line)
+        return
+
+    # اطبع جزءًا كبيرًا حول الدالة
+    print(source[start:start + 12000])
 
     print()
     print("=" * 80)
