@@ -8,7 +8,7 @@ import glob
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Searching pybedrock examples for block palette...")
+    print("Searching blockentity_demo JSON files...")
     print("=" * 80)
 
     temp_dir = tempfile.mkdtemp()
@@ -48,67 +48,70 @@ def main():
     with tarfile.open(archives[0], "r:gz") as tar:
         tar.extractall(extract_dir)
 
-    found = 0
+    demo_dir = None
 
     for root, dirs, files in os.walk(extract_dir):
-        for filename in files:
-            if not filename.endswith((".py", ".ipynb", ".txt")):
-                continue
-
-            path = os.path.join(root, filename)
-
-            try:
-                with open(
-                    path,
-                    "r",
-                    encoding="utf-8",
-                    errors="ignore"
-                ) as f:
-                    content = f.read()
-            except Exception:
-                continue
-
-            # نبحث عن أمثلة مرتبطة بالبلوكات والـpalette
-            keywords = [
-                "minecraft:stone",
-                "minecraft:grass",
-                "minecraft:dirt",
-                "minecraft:water",
-                "palette",
-                "writeNBT",
-            ]
-
-            if any(keyword in content for keyword in keywords):
-                print()
-                print("=" * 80)
-                print("FILE:", path)
-                print("=" * 80)
-
-                lines = content.splitlines()
-
-                for i, line in enumerate(lines):
-                    if any(keyword in line for keyword in keywords):
-                        start = max(0, i - 8)
-                        end = min(len(lines), i + 15)
-
-                        print()
-                        print(f"--- around line {i + 1} ---")
-
-                        for j in range(start, end):
-                            print(f"{j + 1}: {lines[j]}")
-
-                        found += 1
-
-                        if found >= 20:
-                            break
-
-            if found >= 20:
-                break
-
-        if found >= 20:
+        if os.path.basename(root) == "blockentity_demo":
+            demo_dir = root
             break
 
+    if demo_dir is None:
+        # بعض النسخ يكون المثال ملف ipynb فقط
+        for root, dirs, files in os.walk(extract_dir):
+            if "blockentity_demo.ipynb" in files:
+                demo_dir = root
+                break
+
+    if demo_dir is None:
+        print("blockentity_demo directory not found.")
+        return
+
+    print("Demo directory:")
+    print(demo_dir)
     print()
+
+    found = False
+
+    for root, dirs, files in os.walk(demo_dir):
+        for filename in files:
+            path = os.path.join(root, filename)
+
+            print("FILE:", path)
+
+            try:
+                size = os.path.getsize(path)
+                print("SIZE:", size, "bytes")
+            except Exception:
+                pass
+
+            if filename.endswith(".json"):
+                found = True
+
+                print()
+                print("JSON CONTENT:")
+                print("-" * 80)
+
+                try:
+                    with open(
+                        path,
+                        "r",
+                        encoding="utf-8",
+                        errors="ignore"
+                    ) as f:
+                        content = f.read()
+
+                    print(content[:12000])
+
+                except Exception as e:
+                    print("Could not read:", e)
+
+                print("-" * 80)
+
+            print()
+
+    if not found:
+        print("No JSON files found in blockentity_demo.")
+
     print("=" * 80)
     print("Finished.")
     print("No world files were modified.")
