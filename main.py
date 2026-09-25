@@ -2,25 +2,9 @@ import pybedrock
 import plyvel
 
 
-def get_shape(data):
-    shape = []
-
-    current = data
-
-    while isinstance(current, list):
-        shape.append(len(current))
-
-        if not current:
-            break
-
-        current = current[0]
-
-    return shape
-
-
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Analyzing decoded Subchunk structure...")
+    print("Inspecting Subchunk values...")
 
     db = plyvel.DB("world/db", create_if_missing=False)
 
@@ -36,23 +20,42 @@ def main():
 
     print()
     print("Record size:", len(value), "bytes")
-    print("Result type:", type(result))
-    print("Structure:", get_shape(result))
+    print("Structure:", len(result), "x", len(result[0]), "x", len(result[0][0]))
+
+    # جمع كل القيم الموجودة
+    values = set()
+
+    for y in range(16):
+        for z in range(16):
+            for x in range(16):
+                values.add(result[y][z][x])
+
+    values = sorted(values)
 
     print()
-    print("Top-level elements:", len(result))
+    print("Unique values:", len(values))
+    print("Values:")
+    print(values)
 
-    for i, item in enumerate(result):
-        if isinstance(item, list):
-            print(f"Element {i}: {len(item)} rows")
+    # عرض الطبقة الوسطى فقط
+    y = 8
 
-            if len(item) > 0 and isinstance(item[0], list):
-                print(f"Element {i}: {len(item[0])} columns")
+    print()
+    print("Layer Y=8:")
+    print()
+
+    for z in range(16):
+        row = []
+
+        for x in range(16):
+            row.append(result[y][z][x])
+
+        print(" ".join(f"{v:3}" for v in row))
 
     db.close()
 
     print()
-    print("Structure analysis completed.")
+    print("Inspection completed.")
 
 
 if __name__ == "__main__":
