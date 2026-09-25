@@ -8,12 +8,9 @@ import glob
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Inspecting pybedrock source...")
+    print("Downloading pybedrock source only...")
 
     temp_dir = tempfile.mkdtemp()
-
-    print()
-    print("Downloading pybedrock 0.0.7 source...")
 
     result = subprocess.run(
         [
@@ -24,6 +21,8 @@ def main():
             "pybedrock==0.0.7",
             "--no-binary",
             ":all:",
+            "--no-deps",
+            "--no-build-isolation",
             "-d",
             temp_dir,
         ],
@@ -38,56 +37,58 @@ def main():
         print(result.stderr)
         return
 
-    files = glob.glob(os.path.join(temp_dir, "*.tar.gz"))
+    archives = glob.glob(os.path.join(temp_dir, "*.tar.gz"))
 
-    if not files:
+    if not archives:
         print("Source archive not found.")
         return
 
-    archive = files[0]
+    archive = archives[0]
 
-    print("Source archive:", archive)
+    print()
+    print("Source archive found:")
+    print(archive)
 
     extract_dir = os.path.join(temp_dir, "source")
-
     os.makedirs(extract_dir, exist_ok=True)
 
     with tarfile.open(archive, "r:gz") as tar:
         tar.extractall(extract_dir)
 
     print()
-    print("Searching source files for writeSubchunk...")
-
+    print("Searching source for writeSubchunk...")
+    
     found = False
 
     for root, dirs, filenames in os.walk(extract_dir):
         for filename in filenames:
-
             path = os.path.join(root, filename)
 
             try:
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
+                with open(
+                    path,
+                    "r",
+                    encoding="utf-8",
+                    errors="ignore"
+                ) as f:
+                    lines = f.readlines()
             except Exception:
                 continue
 
-            if "writeSubchunk" in content:
-                found = True
+            for i, line in enumerate(lines):
+                if "writeSubchunk" in line:
+                    found = True
 
-                print()
-                print("=" * 70)
-                print("FOUND:", path)
-                print("=" * 70)
+                    print()
+                    print("=" * 70)
+                    print("FOUND:", path)
+                    print("=" * 70)
 
-                lines = content.splitlines()
+                    start = max(0, i - 15)
+                    end = min(len(lines), i + 25)
 
-                for i, line in enumerate(lines):
-                    if "writeSubchunk" in line:
-                        start = max(0, i - 8)
-                        end = min(len(lines), i + 15)
-
-                        for n in range(start, end):
-                            print(f"{n + 1}: {lines[n]}")
+                    for n in range(start, end):
+                        print(f"{n + 1}: {lines[n].rstrip()}")
 
     if not found:
         print()
