@@ -4,7 +4,7 @@ import plyvel
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Inspecting Subchunk values...")
+    print("Inspecting Subchunk palette...")
 
     db = plyvel.DB("world/db", create_if_missing=False)
 
@@ -20,42 +20,42 @@ def main():
 
     print()
     print("Record size:", len(value), "bytes")
-    print("Structure:", len(result), "x", len(result[0]), "x", len(result[0][0]))
-
-    # جمع كل القيم الموجودة
-    values = set()
-
-    for y in range(16):
-        for z in range(16):
-            for x in range(16):
-                values.add(result[y][z][x])
-
-    values = sorted(values)
+    print("Decoded structure: 16 x 16 x 16")
 
     print()
-    print("Unique values:", len(values))
-    print("Values:")
-    print(values)
+    print("Searching for palette information...")
 
-    # عرض الطبقة الوسطى فقط
-    y = 8
+    # اطبع نوع ومحتويات العناصر العليا فقط
+    for i, item in enumerate(result):
+        print(
+            f"Layer {i}: type={type(item).__name__}, "
+            f"rows={len(item)}, "
+            f"columns={len(item[0]) if item else 0}"
+        )
 
     print()
-    print("Layer Y=8:")
-    print()
+    print("Testing writeSubchunk compatibility...")
 
-    for z in range(16):
-        row = []
+    try:
+        encoded = pybedrock.writeSubchunk(result)
 
-        for x in range(16):
-            row.append(result[y][z][x])
+        print("writeSubchunk SUCCESS!")
+        print("Encoded size:", len(encoded), "bytes")
 
-        print(" ".join(f"{v:3}" for v in row))
+        if encoded == value:
+            print("Encoded data is IDENTICAL to original record.")
+        else:
+            print("Encoded data differs from original record.")
+            print("This is useful information, but we will NOT write it to the world yet.")
+
+    except Exception as e:
+        print("writeSubchunk FAILED")
+        print("Error:", repr(e))
 
     db.close()
 
     print()
-    print("Inspection completed.")
+    print("Palette/write analysis completed.")
 
 
 if __name__ == "__main__":
