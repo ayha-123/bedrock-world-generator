@@ -1,0 +1,20 @@
+name: Test Minecraft Generator
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: تحميل المشروع
+        uses: actions/checkout@v6
+
+      - name: تجهيز Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: تشغيل المولد
+        run: python main.py
