@@ -8,7 +8,7 @@ import glob
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Reading writeNBT implementation...")
+    print("Searching pybedrock examples for block palette...")
     print("=" * 80)
 
     temp_dir = tempfile.mkdtemp()
@@ -48,69 +48,68 @@ def main():
     with tarfile.open(archives[0], "r:gz") as tar:
         tar.extractall(extract_dir)
 
-    # البحث عن ملف C/C++ الذي يحتوي writeNBT
-    matches = []
+    found = 0
 
     for root, dirs, files in os.walk(extract_dir):
         for filename in files:
-            if filename.endswith((".cpp", ".c", ".h")):
-                path = os.path.join(root, filename)
+            if not filename.endswith((".py", ".ipynb", ".txt")):
+                continue
 
-                try:
-                    with open(
-                        path,
-                        "r",
-                        encoding="utf-8",
-                        errors="ignore"
-                    ) as f:
-                        content = f.read()
+            path = os.path.join(root, filename)
 
-                    if "writeNBT" in content:
-                        matches.append(path)
+            try:
+                with open(
+                    path,
+                    "r",
+                    encoding="utf-8",
+                    errors="ignore"
+                ) as f:
+                    content = f.read()
+            except Exception:
+                continue
 
-                except Exception:
-                    pass
+            # نبحث عن أمثلة مرتبطة بالبلوكات والـpalette
+            keywords = [
+                "minecraft:stone",
+                "minecraft:grass",
+                "minecraft:dirt",
+                "minecraft:water",
+                "palette",
+                "writeNBT",
+            ]
 
-    if not matches:
-        print("writeNBT source not found.")
-        return
+            if any(keyword in content for keyword in keywords):
+                print()
+                print("=" * 80)
+                print("FILE:", path)
+                print("=" * 80)
 
-    print("Files containing writeNBT:")
-    for path in matches:
-        print(path)
+                lines = content.splitlines()
+
+                for i, line in enumerate(lines):
+                    if any(keyword in line for keyword in keywords):
+                        start = max(0, i - 8)
+                        end = min(len(lines), i + 15)
+
+                        print()
+                        print(f"--- around line {i + 1} ---")
+
+                        for j in range(start, end):
+                            print(f"{j + 1}: {lines[j]}")
+
+                        found += 1
+
+                        if found >= 20:
+                            break
+
+            if found >= 20:
+                break
+
+        if found >= 20:
+            break
 
     print()
     print("=" * 80)
-
-    # طباعة الجزء الذي يحتوي على writeNBT
-    for path in matches:
-        with open(
-            path,
-            "r",
-            encoding="utf-8",
-            errors="ignore"
-        ) as f:
-            lines = f.readlines()
-
-        for i, line in enumerate(lines):
-            if "writeNBT" not in line:
-                continue
-
-            print()
-            print("=" * 80)
-            print("FILE:", path)
-            print("STARTING AROUND LINE:", i + 1)
-            print("=" * 80)
-
-            start = max(0, i - 20)
-            end = min(len(lines), i + 180)
-
-            for j in range(start, end):
-                print(f"{j + 1}: {lines[j].rstrip()}")
-
-            print()
-            print("=" * 80)
-
     print("Finished.")
     print("No world files were modified.")
 
