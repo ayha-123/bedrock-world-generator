@@ -7,7 +7,7 @@ import glob
 
 
 def main():
-    print("Reading pybedrock readSubchunk source...")
+    print("Searching for index2pos...")
     print("=" * 80)
 
     temp_dir = tempfile.mkdtemp()
@@ -46,36 +46,30 @@ def main():
     with tarfile.open(archives[0], "r:gz") as tar:
         tar.extractall(extract_dir)
 
-    target = None
-
     for root, dirs, files in os.walk(extract_dir):
-        if "subchunk.cpp" in files:
-            target = os.path.join(root, "subchunk.cpp")
-            break
+        for filename in files:
+            if filename.endswith((".cpp", ".h", ".hpp")):
+                path = os.path.join(root, filename)
 
-    if target is None:
-        print("subchunk.cpp not found.")
-        return
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    source = f.read()
 
-    with open(target, "r", encoding="utf-8", errors="replace") as f:
-        source = f.read()
+                if "index2pos" in source:
+                    print("FILE:", path)
+                    print("=" * 80)
 
-    start = source.find("py_readSubchunk")
+                    pos = 0
+                    while True:
+                        pos = source.find("index2pos", pos)
 
-    if start == -1:
-        print("py_readSubchunk not found.")
-        print()
-        print("Functions found:")
-        for line in source.splitlines():
-            if "readSubchunk" in line:
-                print(line)
-        return
+                        if pos == -1:
+                            break
 
-    # اطبع جزءًا كبيرًا حول الدالة
-    print(source[start:start + 12000])
+                        print(source[max(0, pos - 1000):pos + 2500])
+                        print("=" * 80)
 
-    print()
-    print("=" * 80)
+                        pos += len("index2pos")
+
     print("Finished.")
 
 
