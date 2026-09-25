@@ -1,116 +1,116 @@
-import sys
-import subprocess
-import tempfile
-import tarfile
 import os
-import glob
+import struct
+import plyvel
+
+
+DB_PATH = "world/db"
+
+
+def read_u32(data, offset):
+    if offset + 4 > len(data):
+        return None
+    return struct.unpack_from("<I", data, offset)[0]
+
+
+def inspect_subchunk(key, value):
+    if len(value) < 8:
+        return None
+
+    version = value[0]
+    storage_layer = value[1]
+    yindex = value[2]
+    ptype = value[3]
+
+    savetype = ptype & 1
+    bits_per_block = ptype >> 1
+
+    if bits_per_block == 0:
+        blocks_per_word = 0
+    else:
+        blocks_per_word = 32 // bits_per_block
+
+    # عدد كلمات 32-bit التي يقرأها pybedrock
+    if blocks_per_word:
+        n32bit = (4096 // blocks_per_word) + 1
+        data_size = n32bit * 4
+    else:
+        n32bit = 0
+        data_size = 0
+
+    palette_offset = 4 + data_size
+
+    palette_size = None
+
+    if palette_offset + 4 <= len(value):
+        palette_size = read_u32(value, palette_offset)
+
+    return {
+        "key": key.hex(),
+        "value_size": len(value),
+        "version": version,
+        "storage_layer": storage_layer,
+        "yindex": yindex,
+        "ptype": ptype,
+        "savetype": savetype,
+        "bits_per_block": bits_per_block,
+        "blocks_per_word": blocks_per_word,
+        "n32bit": n32bit,
+        "data_size": data_size,
+        "palette_offset": palette_offset,
+        "palette_size": palette_size,
+    }
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Reading complete readSubchunk implementation...")
+    print("READ-ONLY Subchunk Inspector")
+    print("=" * 70)
 
-    temp_dir = tempfile.mkdtemp()
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "download",
-            "pybedrock==0.0.7",
-            "--no-binary",
-            ":all:",
-            "--no-deps",
-            "--no-build-isolation",
-            "-d",
-            temp_dir,
-        ],
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        print("Download failed:")
-        print(result.stderr)
+    if not os.path.isdir(DB_PATH):
+        print("ERROR: world/db not found.")
         return
 
-    archives = glob.glob(os.path.join(temp_dir, "*.tar.gz"))
+    print("Opening LevelDB...")
+    print("Database:", DB_PATH)
+    print()
 
-    if not archives:
-        print("Source archive not found.")
-        return
+    db = plyvel.DB(DB_PATH, create_if_missing=False)
 
-    extract_dir = os.path.join(temp_dir, "source")
-    os.makedirs(extract_dir, exist_ok=True)
+    found = 0
 
-    with tarfile.open(archives[0], "r:gz") as tar:
-        tar.extractall(extract_dir)
+    try:
+        for key, value in db:
+            # سجلات الـSubchunk التي نريد فحصها
+            # نركز على المفاتيح التي تنتهي بـ 2f00
+            if not key.endswith(bytes.fromhex("2f00")):
+                continue
 
-    source_file = None
+            info = inspect_subchunk(key, value)
 
-    for root, dirs, files in os.walk(extract_dir):
-        for filename in files:
-            if filename == "subchunk.cpp":
-                source_file = os.path.join(root, filename)
+            if info is None:
+                continue
+
+            found += 1
+
+            print("-" * 70)
+            print("SUBCHUNK", found)
+
+            for name, val in info.items():
+                print(f"{name:20}: {val}")
+
+            # نوقف بعد أول 20 سجل حتى يبقى الناتج صغيراً
+            if found >= 20:
+                print()
+                print("Stopped after 20 subchunks.")
                 break
-        if source_file:
-            break
 
-    if not source_file:
-        print("subchunk.cpp not found.")
-        return
-
-    with open(
-        source_file,
-        "r",
-        encoding="utf-8",
-        errors="ignore"
-    ) as f:
-        lines = f.readlines()
-
-    start = None
-    end = None
-
-    for i, line in enumerate(lines):
-        if "PyObject* py_readSubchunk" in line:
-            start = i
-
-            brace_count = 0
-            started = False
-
-            for j in range(i, len(lines)):
-                brace_count += lines[j].count("{")
-                brace_count -= lines[j].count("}")
-
-                if "{" in lines[j]:
-                    started = True
-
-                if started and brace_count == 0:
-                    end = j + 1
-                    break
-
-            break
-
-    if start is None:
-        print("py_readSubchunk not found.")
-        return
-
-    if end is None:
-        end = min(len(lines), start + 300)
+    finally:
+        db.close()
 
     print()
-    print("=" * 80)
-    print("COMPLETE py_readSubchunk")
-    print("=" * 80)
-
-    for i in range(start, end):
-        print(f"{i + 1}: {lines[i].rstrip()}")
-
-    print()
-    print("=" * 80)
-    print("END")
-    print("=" * 80)
+    print("=" * 70)
+    print("Finished.")
+    print("No files were modified.")
 
 
 if __name__ == "__main__":
