@@ -4,11 +4,12 @@ import tempfile
 import tarfile
 import os
 import glob
+import json
 
 
 def main():
     print("Minecraft Bedrock World Generator")
-    print("Searching blockentity_demo JSON files...")
+    print("Reading blockentity_demo NBT examples...")
     print("=" * 80)
 
     temp_dir = tempfile.mkdtemp()
@@ -32,7 +33,6 @@ def main():
     )
 
     if result.returncode != 0:
-        print("Download failed:")
         print(result.stderr)
         return
 
@@ -48,71 +48,43 @@ def main():
     with tarfile.open(archives[0], "r:gz") as tar:
         tar.extractall(extract_dir)
 
-    demo_dir = None
+    notebook = None
 
     for root, dirs, files in os.walk(extract_dir):
-        if os.path.basename(root) == "blockentity_demo":
-            demo_dir = root
+        if "blockentity_demo.ipynb" in files:
+            notebook = os.path.join(root, "blockentity_demo.ipynb")
             break
 
-    if demo_dir is None:
-        # بعض النسخ يكون المثال ملف ipynb فقط
-        for root, dirs, files in os.walk(extract_dir):
-            if "blockentity_demo.ipynb" in files:
-                demo_dir = root
-                break
-
-    if demo_dir is None:
-        print("blockentity_demo directory not found.")
+    if notebook is None:
+        print("Notebook not found.")
         return
 
-    print("Demo directory:")
-    print(demo_dir)
-    print()
+    with open(notebook, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    found = False
+    found = 0
 
-    for root, dirs, files in os.walk(demo_dir):
-        for filename in files:
-            path = os.path.join(root, filename)
+    for cell_number, cell in enumerate(data.get("cells", []), 1):
+        source = "".join(cell.get("source", []))
 
-            print("FILE:", path)
-
-            try:
-                size = os.path.getsize(path)
-                print("SIZE:", size, "bytes")
-            except Exception:
-                pass
-
-            if filename.endswith(".json"):
-                found = True
-
-                print()
-                print("JSON CONTENT:")
-                print("-" * 80)
-
-                try:
-                    with open(
-                        path,
-                        "r",
-                        encoding="utf-8",
-                        errors="ignore"
-                    ) as f:
-                        content = f.read()
-
-                    print(content[:12000])
-
-                except Exception as e:
-                    print("Could not read:", e)
-
-                print("-" * 80)
+        if any(x in source for x in [
+            "writeNBT",
+            "readNBT",
+            "cspawner",
+            "schunk",
+            "palette"
+        ]):
+            found += 1
 
             print()
+            print("=" * 80)
+            print("CELL:", cell_number)
+            print("=" * 80)
+            print(source)
 
-    if not found:
-        print("No JSON files found in blockentity_demo.")
-
+    print()
     print("=" * 80)
+    print("Found relevant cells:", found)
     print("Finished.")
     print("No world files were modified.")
 
