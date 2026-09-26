@@ -1,7 +1,8 @@
 import zipfile
 import os
 import shutil
-import plyvel
+import random
+import math
 
 
 def prepare_world():
@@ -35,61 +36,75 @@ def prepare_world():
                 break
 
 
-def inspect_chunks(db):
-    chunks = {}
+def generate_islands(seed):
+    rng = random.Random(seed)
 
-    for key, value in db:
-        if len(key) < 8:
-            continue
+    islands = []
 
-        x = int.from_bytes(
-            key[0:4],
-            byteorder="little",
-            signed=True
-        )
+    for i in range(30):
+        angle = rng.uniform(0, math.pi * 2)
+        distance = rng.uniform(200, 5000)
 
-        z = int.from_bytes(
-            key[4:8],
-            byteorder="little",
-            signed=True
-        )
+        x = int(math.cos(angle) * distance)
+        z = int(math.sin(angle) * distance)
 
-        position = (x, z)
+        size_type = rng.random()
 
-        if position not in chunks:
-            chunks[position] = 0
+        if size_type < 0.55:
+            radius = rng.randint(12, 35)
+            island_type = "small"
+        elif size_type < 0.88:
+            radius = rng.randint(36, 90)
+            island_type = "medium"
+        else:
+            radius = rng.randint(100, 220)
+            island_type = "large"
 
-        chunks[position] += 1
+        height = rng.randint(4, 25)
 
-    print("CHUNKS FOUND:", len(chunks))
+        islands.append({
+            "x": x,
+            "z": z,
+            "radius": radius,
+            "height": height,
+            "type": island_type
+        })
 
-    for position, records in list(chunks.items())[:10]:
-        print(
-            "CHUNK:",
-            position[0],
-            position[1],
-            "RECORDS:",
-            records
-        )
+    return islands
 
 
 def main():
     print("Minecraft Open World Generator")
     print("=" * 60)
 
+    seed = 123456789
+
     prepare_world()
 
-    db = plyvel.DB(
-        "world/db",
-        create_if_missing=False
-    )
+    islands = generate_islands(seed)
 
-    inspect_chunks(db)
+    print("SEED:", seed)
+    print("ISLANDS:", len(islands))
+    print("=" * 60)
 
-    db.close()
+    for number, island in enumerate(islands, 1):
+        print(
+            "ISLAND",
+            number,
+            "X:",
+            island["x"],
+            "Z:",
+            island["z"],
+            "RADIUS:",
+            island["radius"],
+            "HEIGHT:",
+            island["height"],
+            "TYPE:",
+            island["type"]
+        )
 
     print("=" * 60)
-    print("CHUNK SYSTEM INSPECTION COMPLETED")
+    print("ISLAND GENERATION COMPLETED")
 
 
 if __name__ == "__main__":
