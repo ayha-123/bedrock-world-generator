@@ -3,11 +3,9 @@ import os
 import shutil
 import plyvel
 
-
 def prepare_world():
     if os.path.exists("world"):
         shutil.rmtree("world")
-
     os.makedirs("world", exist_ok=True)
 
     with zipfile.ZipFile("template.zip", "r") as z:
@@ -34,59 +32,41 @@ def prepare_world():
                 os.rmdir(old)
                 break
 
-
 def main():
-    print("Minecraft Chunk Locator")
+    print("Minecraft Block Test")
     print("=" * 60)
 
     prepare_world()
 
-    db = plyvel.DB(
-        "world/db",
-        create_if_missing=False
-    )
+    db = plyvel.DB("world/db", create_if_missing=False)
 
-    target_x = 73 // 16
-    target_z = 256 // 16
+    key = bytes.fromhex("04000000100000002f04")
+    value = db.get(key)
 
-    print("BLOCK X:", 73)
-    print("BLOCK Z:", 256)
-    print("CHUNK X:", target_x)
-    print("CHUNK Z:", target_z)
-    print("=" * 60)
+    if value is None:
+        print("TARGET SUBCHUNK NOT FOUND")
+        db.close()
+        return
 
-    found = 0
+    print("TARGET FOUND")
+    print("KEY:", key.hex())
+    print("SIZE:", len(value))
 
-    for key, value in db:
-        if len(key) < 8:
-            continue
+    data = bytearray(value)
 
-        x = int.from_bytes(
-            key[0:4],
-            byteorder="little",
-            signed=True
-        )
+    old_byte = data[4]
+    data[4] = old_byte ^ 0x10
 
-        z = int.from_bytes(
-            key[4:8],
-            byteorder="little",
-            signed=True
-        )
+    db.put(key, bytes(data))
 
-        if x == target_x and z == target_z:
-            print("MATCH")
-            print("KEY:", key.hex())
-            print("SIZE:", len(value))
-            print("LAST BYTES:", value[-16:].hex())
-            print()
-
-            found += 1
+    print("BLOCK DATA CHANGED")
+    print("OLD BYTE:", hex(old_byte))
+    print("NEW BYTE:", hex(data[4]))
 
     db.close()
 
     print("=" * 60)
-    print("MATCHING RECORDS:", found)
-
+    print("DONE")
 
 if __name__ == "__main__":
     main()
