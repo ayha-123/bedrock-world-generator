@@ -1,6 +1,8 @@
 import zipfile
 import os
 import shutil
+import math
+import random
 import plyvel
 
 
@@ -48,23 +50,64 @@ def change_raw_palette(value, x, y, z, new_id):
 
     offset = 4 + word_index * 4
 
+    if offset + 4 > len(value):
+        return value
+
     word = int.from_bytes(
         value[offset:offset + 4],
         byteorder="little"
     )
 
-    old_id = (word >> bit_offset) & mask
-
     word &= ~(mask << bit_offset)
     word |= (new_id & mask) << bit_offset
 
     data = bytearray(value)
+
     data[offset:offset + 4] = word.to_bytes(
         4,
         byteorder="little"
     )
 
-    return bytes(data), old_id
+    return bytes(data)
+
+
+def generate_test_world(db, seed):
+    random.seed(seed)
+
+    target = bytes.fromhex("02000000110000002f00")
+
+    value = db.get(target)
+
+    if value is None:
+        print("TARGET RECORD NOT FOUND")
+        return
+
+    data = value
+
+    for z in range(16):
+        for x in range(16):
+            distance = math.sqrt(
+                (x - 7.5) ** 2 +
+                (z - 7.5) ** 2
+            )
+
+            if distance < 5:
+                palette = 1
+            else:
+                palette = 0
+
+            data = change_raw_palette(
+                data,
+                x,
+                0,
+                z,
+                palette
+            )
+
+    db.put(target, data)
+
+    print("TEST ISLAND GENERATED")
+    print("SEED:", seed)
 
 
 def main():
@@ -73,43 +116,19 @@ def main():
 
     prepare_world()
 
-    db = plyvel.DB("world/db", create_if_missing=False)
+    seed = 123456789
 
-    target = bytes.fromhex("02000000110000002f00")
-
-    value = db.get(target)
-
-    if value is None:
-        print("TARGET RECORD NOT FOUND")
-        db.close()
-        return
-
-    print("ORIGINAL SIZE:", len(value))
-    print("ORIGINAL WORD:", value[4:8].hex())
-
-    modified, old_id = change_raw_palette(
-        value,
-        0,
-        0,
-        0,
-        1
+    db = plyvel.DB(
+        "world/db",
+        create_if_missing=False
     )
 
-    print("OLD RAW PALETTE ID:", old_id)
-    print("NEW RAW PALETTE ID:", 1)
-    print("NEW WORD:", modified[4:8].hex())
-
-    if modified[4:8] != value[4:8]:
-        db.put(target, modified)
-        print("BLOCK DATA CHANGED")
-        print("LEVELDB UPDATED")
-    else:
-        print("BLOCK DATA WAS NOT CHANGED")
+    generate_test_world(db, seed)
 
     db.close()
 
     print("=" * 60)
-    print("RAW BLOCK TEST COMPLETED.")
+    print("WORLD GENERATION COMPLETED")
 
 
 if __name__ == "__main__":
