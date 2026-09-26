@@ -1,5 +1,4 @@
 import sys
-import math
 
 def main():
     if len(sys.argv) < 3:
@@ -9,15 +8,15 @@ def main():
     seed = int(sys.argv[1])
     world_size = int(sys.argv[2])
 
-    chunks_per_side = math.ceil(world_size / 16)
-    total_chunks = chunks_per_side * chunks_per_side
-
     print("Minecraft World Generator")
     print("=" * 60)
     print("SEED:", seed)
     print("WORLD SIZE:", world_size)
-    print("CHUNKS PER SIDE:", chunks_per_side)
-    print("TOTAL CHUNKS:", total_chunks)
+    print("=" * 60)
+    print("GENERATION TEST")
+    print("CHUNK X: 0")
+    print("CHUNK Z: 0")
+    print("STATUS: READY")
     print("=" * 60)
 
 if __name__ == "__main__":
