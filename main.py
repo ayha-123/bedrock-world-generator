@@ -2,7 +2,6 @@ import zipfile
 import os
 import shutil
 import plyvel
-import pybedrock as pb
 
 
 def prepare_world():
@@ -36,6 +35,38 @@ def prepare_world():
                 break
 
 
+def change_raw_palette(value, x, y, z, new_id):
+    bits = value[3] >> 1
+    blocks_per_word = 32 // bits
+
+    index = 256 * x + 16 * z + y
+    word_index = index // blocks_per_word
+    block_index = index % blocks_per_word
+
+    bit_offset = block_index * bits
+    mask = (1 << bits) - 1
+
+    offset = 4 + word_index * 4
+
+    word = int.from_bytes(
+        value[offset:offset + 4],
+        byteorder="little"
+    )
+
+    old_id = (word >> bit_offset) & mask
+
+    word &= ~(mask << bit_offset)
+    word |= (new_id & mask) << bit_offset
+
+    data = bytearray(value)
+    data[offset:offset + 4] = word.to_bytes(
+        4,
+        byteorder="little"
+    )
+
+    return bytes(data), old_id
+
+
 def main():
     print("Minecraft Bedrock World Generator")
     print("=" * 60)
@@ -46,66 +77,39 @@ def main():
 
     target = bytes.fromhex("02000000110000002f00")
 
-    for key, value in db:
+    value = db.get(target)
 
-        if key != target:
-            continue
-
-        print("KEY:", key.hex())
-        print("SIZE:", len(value))
-        print("HEADER:", value[:4].hex())
-        print("FIRST 32 BYTES:", value[:32].hex())
-
-        bits = value[3] >> 1
-        blocks_per_word = 32 // bits
-
-        print("BITS:", bits)
-        print("BLOCKS PER WORD:", blocks_per_word)
-
-        blocks = pb.readSubchunk(value)
-
-        print("MATRIX:", len(blocks), len(blocks[0]), len(blocks[0][0]))
-
-        print("FIRST 16 BLOCK IDS:")
-
-        for i in range(16):
-            print(i, blocks[0][0][i])
-
-        print("=" * 60)
-        print("RAW WORDS:")
-
-        for i in range(4):
-            offset = 4 + i * 4
-            word = int.from_bytes(
-                value[offset:offset + 4],
-                byteorder="little"
-            )
-
-            ids = []
-
-            for j in range(blocks_per_word):
-                ids.append(
-                    (word >> (j * bits)) & ((1 << bits) - 1)
-                )
-
-            print(
-                "WORD",
-                i,
-                "HEX:",
-                value[offset:offset + 4].hex(),
-                "IDS:",
-                ids
-            )
-
+    if value is None:
+        print("TARGET RECORD NOT FOUND")
         db.close()
-
-        print("=" * 60)
-        print("RAW DATA TEST COMPLETED.")
         return
+
+    print("ORIGINAL SIZE:", len(value))
+    print("ORIGINAL WORD:", value[4:8].hex())
+
+    modified, old_id = change_raw_palette(
+        value,
+        0,
+        0,
+        0,
+        1
+    )
+
+    print("OLD RAW PALETTE ID:", old_id)
+    print("NEW RAW PALETTE ID:", 1)
+    print("NEW WORD:", modified[4:8].hex())
+
+    if modified[4:8] != value[4:8]:
+        db.put(target, modified)
+        print("BLOCK DATA CHANGED")
+        print("LEVELDB UPDATED")
+    else:
+        print("BLOCK DATA WAS NOT CHANGED")
 
     db.close()
 
-    print("TARGET RECORD NOT FOUND.")
+    print("=" * 60)
+    print("RAW BLOCK TEST COMPLETED.")
 
 
 if __name__ == "__main__":
