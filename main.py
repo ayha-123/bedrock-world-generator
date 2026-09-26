@@ -35,4 +35,62 @@ def prepare_world():
                 break
 
 
-def inspect_chunks
+def inspect_chunks(db):
+    chunks = {}
+
+    for key, value in db:
+        if len(key) < 8:
+            continue
+
+        x = int.from_bytes(
+            key[0:4],
+            byteorder="little",
+            signed=True
+        )
+
+        z = int.from_bytes(
+            key[4:8],
+            byteorder="little",
+            signed=True
+        )
+
+        position = (x, z)
+
+        if position not in chunks:
+            chunks[position] = 0
+
+        chunks[position] += 1
+
+    print("CHUNKS FOUND:", len(chunks))
+
+    for position, records in list(chunks.items())[:10]:
+        print(
+            "CHUNK:",
+            position[0],
+            position[1],
+            "RECORDS:",
+            records
+        )
+
+
+def main():
+    print("Minecraft Open World Generator")
+    print("=" * 60)
+
+    prepare_world()
+
+    db = plyvel.DB(
+        "world/db",
+        create_if_missing=False
+    )
+
+    inspect_chunks(db)
+
+    db.close()
+
+    print("=" * 60)
+    print("CHUNK SYSTEM INSPECTION COMPLETED")
+
+
+if __name__ == "__main__":
+    main()
