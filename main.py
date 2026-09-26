@@ -59,6 +59,7 @@ def change_block(value, x, y, z, new_palette_id):
     word |= (new_palette_id & mask) << bit_offset
 
     data = bytearray(value)
+
     data[offset:offset + 4] = word.to_bytes(
         4,
         byteorder="little"
@@ -85,12 +86,7 @@ def main():
 
             old_id = blocks[0][0][0]
 
-            new_id = old_id
-
-            for candidate in range(16):
-                if candidate != old_id:
-                    new_id = candidate
-                    break
+            new_id = (old_id + 1) % 16
 
             modified = change_block(
                 value,
@@ -102,16 +98,20 @@ def main():
 
             test_blocks = pb.readSubchunk(modified)
 
+            actual_id = test_blocks[0][0][0]
+
             print("SUCCESS")
             print("Key:", key.hex())
             print("Old palette ID:", old_id)
-            print("New palette ID:", test_blocks[0][0][0])
+            print("Requested palette ID:", new_id)
+            print("Actual palette ID:", actual_id)
 
-            db.put(key, modified)
-
-            print("WORLD DATABASE UPDATED")
-            print("Original size:", len(value))
-            print("New size:", len(modified))
+            if actual_id != old_id:
+                db.put(key, modified)
+                print("BLOCK CHANGED")
+                print("WORLD DATABASE UPDATED")
+            else:
+                print("BLOCK WAS NOT CHANGED")
 
             break
 
