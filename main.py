@@ -14,15 +14,10 @@ def prepare_world():
         z.extractall("world")
 
     if not os.path.exists("world/db"):
-        folders = [
-            x for x in os.listdir("world")
-            if os.path.isdir(os.path.join("world", x))
-        ]
+        for folder in os.listdir("world"):
+            path = os.path.join("world", folder, "db")
 
-        for folder in folders:
-            candidate = os.path.join("world", folder, "db")
-
-            if os.path.exists(candidate):
+            if os.path.exists(path):
                 old = os.path.join("world", folder)
 
                 for item in os.listdir(old):
@@ -35,9 +30,6 @@ def prepare_world():
                 break
 
 def main():
-    print("Minecraft Stone Block Test")
-    print("=" * 60)
-
     prepare_world()
 
     db = plyvel.DB("world/db", create_if_missing=False)
@@ -46,32 +38,35 @@ def main():
     value = db.get(key)
 
     if value is None:
-        print("TARGET SUBCHUNK NOT FOUND")
+        print("TARGET NOT FOUND")
         db.close()
         return
 
-    print("TARGET SUBCHUNK FOUND")
-    print("KEY:", key.hex())
+    print("TARGET FOUND")
     print("SIZE:", len(value))
+    print("HEADER:", value[:4].hex())
 
     blocks = pb.readSubchunk(value)
 
-    local_x = 73 % 16
-    local_y = 67 % 16
-    local_z = 256 % 16
+    x = 73 % 16
+    y = 67 % 16
+    z = 256 % 16
 
-    print("LOCAL X:", local_x)
-    print("LOCAL Y:", local_y)
-    print("LOCAL Z:", local_z)
+    print("LOCAL:", x, y, z)
+    print("BLOCK ID:", blocks[y][z][x])
 
-    old_id = blocks[local_y][local_z][local_x]
+    print("SAMPLE BLOCK IDS:")
 
-    print("OLD BLOCK PALETTE ID:", old_id)
+    ids = {}
 
-    print("=" * 60)
-    print("SUBCHUNK READ SUCCESSFULLY")
-    print("TARGET BLOCK LOCATED")
-    print("=" * 60)
+    for yy in range(16):
+        for zz in range(16):
+            for xx in range(16):
+                block_id = blocks[yy][zz][xx]
+                ids[block_id] = ids.get(block_id, 0) + 1
+
+    for block_id, count in sorted(ids.items()):
+        print(block_id, count)
 
     db.close()
 
