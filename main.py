@@ -1,88 +1,92 @@
-import sys
-import subprocess
-import tempfile
-import tarfile
+import zipfile
 import os
-import glob
+import shutil
+import plyvel
+import pybedrock as pb
+
+
+def prepare_world():
+    if os.path.exists("world"):
+        shutil.rmtree("world")
+
+    os.makedirs("world", exist_ok=True)
+
+    with zipfile.ZipFile("template.zip", "r") as z:
+        z.extractall("world")
+
+    if not os.path.exists("world/db"):
+        folders = [
+            x for x in os.listdir("world")
+            if os.path.isdir(os.path.join("world", x))
+        ]
+
+        for folder in folders:
+            candidate = os.path.join("world", folder, "db")
+
+            if os.path.exists(candidate):
+                old = os.path.join("world", folder)
+
+                for item in os.listdir(old):
+                    shutil.move(
+                        os.path.join(old, item),
+                        os.path.join("world", item)
+                    )
+
+                os.rmdir(old)
+                break
 
 
 def main():
-    print("Searching for getuInt...")
-    print("=" * 80)
+    print("Minecraft Bedrock World Generator")
+    print("=" * 60)
 
-    temp_dir = tempfile.mkdtemp()
+    prepare_world()
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "download",
-            "pybedrock==0.0.7",
-            "--no-binary",
-            ":all:",
-            "--no-deps",
-            "--no-build-isolation",
-            "-d",
-            temp_dir,
-        ],
-        capture_output=True,
-        text=True,
-    )
+    db = plyvel.DB("world/db", create_if_missing=False)
 
-    if result.returncode != 0:
-        print(result.stderr)
-        return
+    found = False
 
-    archives = glob.glob(os.path.join(temp_dir, "*.tar.gz"))
+    for key, value in db:
 
-    if not archives:
-        print("Source archive not found.")
-        return
+        if not key.endswith(b"\x2f\x00"):
+            continue
 
-    extract_dir = os.path.join(temp_dir, "source")
-    os.makedirs(extract_dir, exist_ok=True)
+        try:
+            blocks = pb.readSubchunk(value)
 
-    with tarfile.open(archives[0], "r:gz") as tar:
-        tar.extractall(extract_dir)
+            old = blocks[0][0][0]
+            blocks[0][0][0] = old
 
-    for root, dirs, files in os.walk(extract_dir):
-        for filename in files:
-            if filename.endswith((".cpp", ".h", ".hpp")):
-                path = os.path.join(root, filename)
+            bits = value[3] >> 1
+            yindex = value[2]
 
-                with open(
-                    path,
-                    "r",
-                    encoding="utf-8",
-                    errors="replace"
-                ) as f:
-                    source = f.read()
+            new_subchunk = pb.writeSubchunk(
+                blocks,
+                bits,
+                yindex
+            )
 
-                if "getuInt" in source:
-                    print("FILE:", path)
-                    print("=" * 80)
+            if len(new_subchunk) > 0:
+                print("SUCCESS")
+                print("Key:", key.hex())
+                print("Original size:", len(value))
+                print("New subchunk size:", len(new_subchunk))
+                print("Bits:", bits)
 
-                    pos = 0
+                found = True
+                break
 
-                    while True:
-                        pos = source.find("getuInt", pos)
+        except Exception:
+            continue
 
-                        if pos == -1:
-                            break
+    db.close()
 
-                        print(
-                            source[
-                                max(0, pos - 500):
-                                pos + 1500
-                            ]
-                        )
+    print("=" * 60)
 
-                        print("=" * 80)
-
-                        pos += len("getuInt")
-
-    print("Finished.")
+    if found:
+        print("Subchunk read/write test completed.")
+    else:
+        print("No suitable subchunk found.")
 
 
 if __name__ == "__main__":
