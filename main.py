@@ -2,10 +2,12 @@ import zipfile
 import os
 import shutil
 import plyvel
+import pybedrock as pb
 
 def prepare_world():
     if os.path.exists("world"):
         shutil.rmtree("world")
+
     os.makedirs("world", exist_ok=True)
 
     with zipfile.ZipFile("template.zip", "r") as z:
@@ -33,7 +35,7 @@ def prepare_world():
                 break
 
 def main():
-    print("Minecraft Block Test")
+    print("Minecraft Stone Block Test")
     print("=" * 60)
 
     prepare_world()
@@ -48,25 +50,30 @@ def main():
         db.close()
         return
 
-    print("TARGET FOUND")
+    print("TARGET SUBCHUNK FOUND")
     print("KEY:", key.hex())
     print("SIZE:", len(value))
 
-    data = bytearray(value)
+    blocks = pb.readSubchunk(value)
 
-    old_byte = data[4]
-    data[4] = old_byte ^ 0x10
+    local_x = 73 % 16
+    local_y = 67 % 16
+    local_z = 256 % 16
 
-    db.put(key, bytes(data))
+    print("LOCAL X:", local_x)
+    print("LOCAL Y:", local_y)
+    print("LOCAL Z:", local_z)
 
-    print("BLOCK DATA CHANGED")
-    print("OLD BYTE:", hex(old_byte))
-    print("NEW BYTE:", hex(data[4]))
+    old_id = blocks[local_y][local_z][local_x]
 
-    db.close()
+    print("OLD BLOCK PALETTE ID:", old_id)
 
     print("=" * 60)
-    print("DONE")
+    print("SUBCHUNK READ SUCCESSFULLY")
+    print("TARGET BLOCK LOCATED")
+    print("=" * 60)
+
+    db.close()
 
 if __name__ == "__main__":
     main()
