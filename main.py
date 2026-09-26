@@ -1,8 +1,7 @@
 import zipfile
 import os
 import shutil
-import random
-import math
+import plyvel
 
 
 def prepare_world():
@@ -36,75 +35,83 @@ def prepare_world():
                 break
 
 
-def generate_islands(seed):
-    rng = random.Random(seed)
+def modify_subchunk(value):
+    data = bytearray(value)
 
-    islands = []
+    bits = value[3] >> 1
+    blocks_per_word = 32 // bits
 
-    for i in range(30):
-        angle = rng.uniform(0, math.pi * 2)
-        distance = rng.uniform(200, 5000)
+    for y in range(16):
+        for z in range(16):
+            for x in range(16):
 
-        x = int(math.cos(angle) * distance)
-        z = int(math.sin(angle) * distance)
+                index = 256 * x + 16 * z + y
 
-        size_type = rng.random()
+                word_index = index // blocks_per_word
+                block_index = index % blocks_per_word
 
-        if size_type < 0.55:
-            radius = rng.randint(12, 35)
-            island_type = "small"
-        elif size_type < 0.88:
-            radius = rng.randint(36, 90)
-            island_type = "medium"
-        else:
-            radius = rng.randint(100, 220)
-            island_type = "large"
+                bit_offset = block_index * bits
+                mask = (1 << bits) - 1
 
-        height = rng.randint(4, 25)
+                offset = 4 + word_index * 4
 
-        islands.append({
-            "x": x,
-            "z": z,
-            "radius": radius,
-            "height": height,
-            "type": island_type
-        })
+                if offset + 4 > len(data):
+                    continue
 
-    return islands
+                word = int.from_bytes(
+                    data[offset:offset + 4],
+                    byteorder="little"
+                )
+
+                if y < 4:
+                    new_id = 1
+                else:
+                    new_id = 0
+
+                word &= ~(mask << bit_offset)
+                word |= (new_id & mask) << bit_offset
+
+                data[offset:offset + 4] = word.to_bytes(
+                    4,
+                    byteorder="little"
+                )
+
+    return bytes(data)
 
 
 def main():
-    print("Minecraft Open World Generator")
+    print("Minecraft Island Generator")
     print("=" * 60)
-
-    seed = 123456789
 
     prepare_world()
 
-    islands = generate_islands(seed)
+    db = plyvel.DB(
+        "world/db",
+        create_if_missing=False
+    )
 
-    print("SEED:", seed)
-    print("ISLANDS:", len(islands))
+    target = bytes.fromhex("02000000110000002f00")
+
+    value = db.get(target)
+
+    if value is None:
+        print("TARGET SUBCHUNK NOT FOUND")
+        db.close()
+        return
+
+    print("ORIGINAL SIZE:", len(value))
+
+    modified = modify_subchunk(value)
+
+    db.put(target, modified)
+
+    print("SUBCHUNK UPDATED")
+    print("NEW SIZE:", len(modified))
+
+    db.close()
+
     print("=" * 60)
-
-    for number, island in enumerate(islands, 1):
-        print(
-            "ISLAND",
-            number,
-            "X:",
-            island["x"],
-            "Z:",
-            island["z"],
-            "RADIUS:",
-            island["radius"],
-            "HEIGHT:",
-            island["height"],
-            "TYPE:",
-            island["type"]
-        )
-
-    print("=" * 60)
-    print("ISLAND GENERATION COMPLETED")
+    print("REAL BLOCK MODIFICATION COMPLETED")
 
 
 if __name__ == "__main__":
