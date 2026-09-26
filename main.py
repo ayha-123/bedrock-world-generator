@@ -35,52 +35,8 @@ def prepare_world():
                 break
 
 
-def modify_subchunk(value):
-    data = bytearray(value)
-
-    bits = value[3] >> 1
-    blocks_per_word = 32 // bits
-
-    for y in range(16):
-        for z in range(16):
-            for x in range(16):
-
-                index = 256 * x + 16 * z + y
-
-                word_index = index // blocks_per_word
-                block_index = index % blocks_per_word
-
-                bit_offset = block_index * bits
-                mask = (1 << bits) - 1
-
-                offset = 4 + word_index * 4
-
-                if offset + 4 > len(data):
-                    continue
-
-                word = int.from_bytes(
-                    data[offset:offset + 4],
-                    byteorder="little"
-                )
-
-                if y < 4:
-                    new_id = 1
-                else:
-                    new_id = 0
-
-                word &= ~(mask << bit_offset)
-                word |= (new_id & mask) << bit_offset
-
-                data[offset:offset + 4] = word.to_bytes(
-                    4,
-                    byteorder="little"
-                )
-
-    return bytes(data)
-
-
 def main():
-    print("Minecraft Island Generator")
+    print("Minecraft Chunk Locator")
     print("=" * 60)
 
     prepare_world()
@@ -90,28 +46,46 @@ def main():
         create_if_missing=False
     )
 
-    target = bytes.fromhex("02000000110000002f00")
+    target_x = 73 // 16
+    target_z = 256 // 16
 
-    value = db.get(target)
+    print("BLOCK X:", 73)
+    print("BLOCK Z:", 256)
+    print("CHUNK X:", target_x)
+    print("CHUNK Z:", target_z)
+    print("=" * 60)
 
-    if value is None:
-        print("TARGET SUBCHUNK NOT FOUND")
-        db.close()
-        return
+    found = 0
 
-    print("ORIGINAL SIZE:", len(value))
+    for key, value in db:
+        if len(key) < 8:
+            continue
 
-    modified = modify_subchunk(value)
+        x = int.from_bytes(
+            key[0:4],
+            byteorder="little",
+            signed=True
+        )
 
-    db.put(target, modified)
+        z = int.from_bytes(
+            key[4:8],
+            byteorder="little",
+            signed=True
+        )
 
-    print("SUBCHUNK UPDATED")
-    print("NEW SIZE:", len(modified))
+        if x == target_x and z == target_z:
+            print("MATCH")
+            print("KEY:", key.hex())
+            print("SIZE:", len(value))
+            print("LAST BYTES:", value[-16:].hex())
+            print()
+
+            found += 1
 
     db.close()
 
     print("=" * 60)
-    print("REAL BLOCK MODIFICATION COMPLETED")
+    print("MATCHING RECORDS:", found)
 
 
 if __name__ == "__main__":
