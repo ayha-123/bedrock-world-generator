@@ -12,23 +12,12 @@ data = db.get(key)
 
 subchunk = pb.readSubchunk(data)
 
-x = 9
-y = 3
-z = 0
-
-old_id = subchunk[y][z][x]
-subchunk[y][z][x] = 3
-
-new_data = pb.writeSubchunk(subchunk, 3, 4)
-
-db.put(key, new_data)
-
-check = pb.readSubchunk(db.get(key))
-
 print("SEED:", seed)
 print("WORLD SIZE:", world_size)
-print("OLD BLOCK ID:", old_id)
-print("NEW BLOCK ID:", check[y][z][x])
-print("SUBCHUNK SIZE:", len(new_data))
+print("RAW SIZE:", len(data))
+print("HEADER:", data[:4].hex())
+print("BITS:", data[3] >> 1)
+print("BLOCK 73 67 256:", subchunk[3][0][9])
+print("BLOCK 0 0 0:", subchunk[0][0][0])
 
 db.close()
