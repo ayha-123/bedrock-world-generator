@@ -51,6 +51,26 @@ jobs:
       - name: Test generator
         run: python main.py "${{ inputs.seed }}" "${{ inputs.world_size }}"
 
+      - name: Verify modified block
+        run: |
+          cd world
+          python - <<'PY'
+          import plyvel
+          import pybedrock as pb
+
+          db = plyvel.DB("db", create_if_missing=False)
+
+          key = bytes.fromhex("04000000100000002f04")
+          data = db.get(key)
+
+          subchunk = pb.readSubchunk(data)
+
+          print("FINAL BLOCK:", subchunk[3][0][9])
+          print("FINAL SIZE:", len(data))
+
+          db.close()
+          PY
+
       - name: Create MCWorld
         run: |
           cd world
