@@ -1,57 +1,42 @@
-import zipfile
-import os
-import shutil
+import sys
 import plyvel
+import pybedrock as pb
 
-def prepare_world():
-    if os.path.exists("world"):
-        shutil.rmtree("world")
+seed = sys.argv[1]
+world_size = int(sys.argv[2])
 
-    os.makedirs("world", exist_ok=True)
+db = plyvel.DB("world/db", create_if_missing=False)
 
-    with zipfile.ZipFile("template.zip", "r") as z:
-        z.extractall("world")
+key = bytes.fromhex("04000000100000002f04")
+data = bytearray(db.get(key))
 
-    if not os.path.exists("world/db"):
-        for folder in os.listdir("world"):
-            source = os.path.join("world", folder)
+bits = data[3] >> 1
+blocks_per_word = 32 // bits
 
-            if os.path.exists(os.path.join(source, "db")):
-                for item in os.listdir(source):
-                    shutil.move(
-                        os.path.join(source, item),
-                        os.path.join("world", item)
-                    )
+x = 9
+y = 3
+z = 0
 
-                os.rmdir(source)
-                break
+index = 256 * x + 16 * z + y
+word_index = index // blocks_per_word
+position = index % blocks_per_word
+offset = 4 + word_index * 4
 
-def main():
-    prepare_world()
+word = int.from_bytes(data[offset:offset + 4], "little")
+shift = position * bits
+mask = ((1 << bits) - 1) << shift
 
-    db = plyvel.DB("world/db", create_if_missing=False)
+old_id = (word >> shift) & ((1 << bits) - 1)
+new_id = 3
 
-    found = 0
+word = (word & ~mask) | (new_id << shift)
+data[offset:offset + 4] = word.to_bytes(4, "little")
 
-    for key, value in db:
-        if len(key) < 9:
-            continue
+db.put(key, bytes(data))
+db.close()
 
-        if key[8] != 0x2f:
-            continue
-
-        if b"minecraft:water" in value:
-            print("WATER SUBCHUNK FOUND")
-            print("KEY:", key.hex())
-            print("SIZE:", len(value))
-            print("HEADER:", value[:4].hex())
-            print()
-            found += 1
-
-    print("=" * 60)
-    print("WATER SUBCHUNKS:", found)
-
-    db.close()
-
-if __name__ == "__main__":
-    main()
+print("SEED:", seed)
+print("WORLD SIZE:", world_size)
+print("OLD BLOCK ID:", old_id)
+print("NEW BLOCK ID:", new_id)
+print("WATER TEST AREA READY")
