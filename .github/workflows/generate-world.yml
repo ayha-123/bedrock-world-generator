@@ -49,24 +49,28 @@ jobs:
           test -d world/db
 
       - name: Test generator
-        run: python main.py "${{ inputs.seed }}" "${{ inputs.world_size }}"
-
-      - name: Verify modified block
         run: |
-          cd world
+          python main.py "${{ inputs.seed }}" "${{ inputs.world_size }}"
+
           python - <<'PY'
           import plyvel
           import pybedrock as pb
 
-          db = plyvel.DB("db", create_if_missing=False)
+          db = plyvel.DB("world/db", create_if_missing=False)
 
           key = bytes.fromhex("04000000100000002f04")
           data = db.get(key)
+
+          if data is None:
+              raise RuntimeError("Target subchunk was not found")
 
           subchunk = pb.readSubchunk(data)
 
           print("FINAL BLOCK:", subchunk[3][0][9])
           print("FINAL SIZE:", len(data))
+
+          if subchunk[3][0][9] != 3:
+              raise RuntimeError("Block modification was not saved correctly")
 
           db.close()
           PY
