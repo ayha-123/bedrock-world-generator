@@ -30,8 +30,8 @@ def prepare_world():
 def set_block(value, x, y, z, new_id):
     data = bytearray(value)
 
-    bits = 4
-    blocks_per_word = 8
+    bits = data[3] >> 1
+    blocks_per_word = 32 // bits
 
     index = 256 * x + 16 * z + y
     word_index = index // blocks_per_word
@@ -45,9 +45,9 @@ def set_block(value, x, y, z, new_id):
     )
 
     shift = position * bits
-    mask = 0xF << shift
+    mask = ((1 << bits) - 1) << shift
 
-    word = (word & ~mask) | ((new_id & 0xF) << shift)
+    word = (word & ~mask) | ((new_id & ((1 << bits) - 1)) << shift)
 
     data[offset:offset + 4] = word.to_bytes(
         4,
@@ -69,13 +69,14 @@ def main():
         db.close()
         return
 
-    blocks_before = pb.readSubchunk(value)
-
     x = 73 % 16
     y = 67 % 16
     z = 256 % 16
 
-    print("BEFORE:", blocks_before[y][z][x])
+    before = pb.readSubchunk(value)
+
+    print("BEFORE:", before[y][z][x])
+    print("BITS:", value[3] >> 1)
 
     new_value = set_block(
         value,
@@ -85,11 +86,11 @@ def main():
         3
     )
 
-    blocks_after = pb.readSubchunk(new_value)
+    after = pb.readSubchunk(new_value)
 
-    print("AFTER:", blocks_after[y][z][x])
+    print("AFTER:", after[y][z][x])
 
-    if blocks_after[y][z][x] != 3:
+    if after[y][z][x] != 3:
         print("BLOCK CHANGE FAILED")
         db.close()
         return
