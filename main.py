@@ -27,6 +27,35 @@ def prepare_world():
                 os.rmdir(source)
                 break
 
+def set_block(value, x, y, z, new_id):
+    data = bytearray(value)
+
+    bits = 4
+    blocks_per_word = 8
+
+    index = 256 * x + 16 * z + y
+    word_index = index // blocks_per_word
+    position = index % blocks_per_word
+
+    offset = 4 + word_index * 4
+
+    word = int.from_bytes(
+        data[offset:offset + 4],
+        byteorder="little"
+    )
+
+    shift = position * bits
+    mask = 0xF << shift
+
+    word = (word & ~mask) | ((new_id & 0xF) << shift)
+
+    data[offset:offset + 4] = word.to_bytes(
+        4,
+        byteorder="little"
+    )
+
+    return bytes(data)
+
 def main():
     prepare_world()
 
@@ -40,31 +69,37 @@ def main():
         db.close()
         return
 
-    print("TARGET FOUND")
-    print("SIZE:", len(value))
-    print("HEADER:", value[:4].hex())
+    blocks_before = pb.readSubchunk(value)
 
-    print("RAW DATA:")
-    print(value[4:].hex())
+    x = 73 % 16
+    y = 67 % 16
+    z = 256 % 16
 
-    blocks = pb.readSubchunk(value)
+    print("BEFORE:", blocks_before[y][z][x])
 
-    print("=" * 60)
-    print("PALETTE IDS")
+    new_value = set_block(
+        value,
+        x,
+        y,
+        z,
+        3
+    )
 
-    ids = {}
+    blocks_after = pb.readSubchunk(new_value)
 
-    for y in range(16):
-        for z in range(16):
-            for x in range(16):
-                block_id = blocks[y][z][x]
-                ids[block_id] = ids.get(block_id, 0) + 1
+    print("AFTER:", blocks_after[y][z][x])
 
-    for block_id, count in sorted(ids.items()):
-        print("ID:", block_id, "COUNT:", count)
+    if blocks_after[y][z][x] != 3:
+        print("BLOCK CHANGE FAILED")
+        db.close()
+        return
 
-    print("=" * 60)
-    print("TARGET BLOCK ID:", blocks[3][0][9])
+    db.put(key, new_value)
+
+    print("BLOCK CHANGED TO STONE")
+    print("X:", 73)
+    print("Y:", 67)
+    print("Z:", 256)
 
     db.close()
 
