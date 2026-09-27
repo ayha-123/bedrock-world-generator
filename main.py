@@ -22,11 +22,17 @@ palette_size = int.from_bytes(
 
 print("SEED:", seed)
 print("WORLD SIZE:", world_size)
-print("RAW SIZE:", len(data))
-print("BITS:", bits)
-print("BLOCKS PER WORD:", blocks_per_word)
-print("WORD COUNT:", word_count)
-print("PALETTE OFFSET:", palette_offset)
 print("PALETTE SIZE:", palette_size)
+
+offset = palette_offset + 4
+
+for i in range(palette_size):
+    try:
+        value, size = pb.readNBT(data[offset:])
+        print("PALETTE", i, ":", value)
+        offset += size
+    except Exception as e:
+        print("PALETTE", i, "ERROR:", str(e))
+        break
 
 db.close()
